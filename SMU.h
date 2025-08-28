@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "DAC8760.h"
 #include "ADS1262.h"
+#include "usb_device.h"
 
 typedef struct
 {
@@ -15,6 +16,15 @@ typedef struct
     uint16_t Voltmeter_AINN;    // Negative analog IN used for the voltmeter
     uint16_t Voltmeter_AINP;    // Positive analog IN used for the voltmeter
 } channel_t;
+
+typedef struct
+{
+    float *values;
+    size_t length;
+    int timeStep;
+    channel_t channel;
+    bool potentiostat; //if it is a potentiostat measure, potentiostat=1, if it is a galvanostat measure, potentiostat=0
+} ArrayMeasurementData;
 
 #pragma region techniques structs
 typedef struct
@@ -79,7 +89,6 @@ typedef struct
 typedef struct
 {
     channel_t channel;
-    channel_t channel;
     float initialCurrent;
     float peak1Current;
     float peak2Current;
@@ -122,8 +131,28 @@ void SMU_CP(CP cp);  // Chronopotentiometry
 void SMU_LSP(LSP lsp); // Linear Sweep Potentiometry
 void SMU_CyP(CyP cyp);  // Cyclic Potentiometry
 
+void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementData channel2Data);
+
+void setLSVParameters(LSV *lsv, char *parameters, bool channel);
+void setCVParameters(CV *cv, char *parameters, bool channel);
+void setDPVParameters(DPV *dpv, char *parameters, bool channel);
+void setSWVParameters(SWV *swv, char *parameters, bool channel);
+
+void setCPParameters(CP *cp, char *parameters, bool channel);
+void setLSPParameters(LSP *lsp, char *parameters, bool channel);
+void setCyPParameters(CyP *cyp, char *parameters, bool channel);
+
+ArrayMeasurementData BuildLSVarray(LSV lsv);
+ArrayMeasurementData BuildCVarray(CV cv);
+ArrayMeasurementData BuildCParray(CP cp);
+ArrayMeasurementData BuildLSParray(LSP lsp);
+ArrayMeasurementData BuildCyParray(CyP cyp);
+
 void SMU_ProcessComandIT();
 void SMU_AbortIT(); // Interruption to abort the measurement
+
+void dwin_interface();
+void pc_interface();
 
 void SMU_UpdateInterfacePC();
 void SMU_UpdateInterfaceDisplay();
