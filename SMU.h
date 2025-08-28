@@ -100,21 +100,21 @@ typedef struct
 
 #pragma endregion
 
-channel_t Channel1;
-channel_t Channel2;
-DAC8760_t Ch1_Potentiostat_DAC; // Potentiostat Channel 1
-DAC8760_t Ch1_Galvanostat_DAC;  // Galvanostat Channel 1
-DAC8760_t Ch2_Potentiostat_DAC; // Potentiostat Channel 2
-DAC8760_t Ch2_Galvanostat_DAC;  // Galvanostat Channel 2
+extern channel_t Channel1;
+extern channel_t Channel2;
+extern DAC8760_t Ch1_Potentiostat_DAC; // Potentiostat Channel 1
+extern DAC8760_t Ch1_Galvanostat_DAC;  // Galvanostat Channel 1
+extern DAC8760_t Ch2_Potentiostat_DAC; // Potentiostat Channel 2
+extern DAC8760_t Ch2_Galvanostat_DAC;  // Galvanostat Channel 2
 
-float currentResistor;
-float ammeterResistors [7] = {10, 100, 1000, 10000, 100000, 1000000, 10000000};
-float currentSourceResistor = 1000;
-bool HMIflag = 0;   // HMI flag -> 0 PC ; 1 DWIN display
+extern float currentResistor;
+extern float ammeterResistors [7];
+extern float currentSourceResistor;
+extern bool HMIflag;   // HMI flag -> 0 PC ; 1 DWIN display
 
-void SMU_Init(void);
+void SMU_Init(SPI_HandleTypeDef DAC8760hspi);
 void Channel_Init(channel_t *channel, DAC8760_t *potentiostat_DAC, DAC8760_t *galvanostat_DAC, uint16_t ammeter_AIN,
-                  uint16_t voltmeter_AINP, uint16_t voltmeter_AINN);
+                  uint16_t voltmeter_AINP, uint16_t voltmeter_AINN, SPI_HandleTypeDef DAC8760hspi);
 
 double SMU_VoltageRead(channel_t channel);
 double SMU_CurrentRead(channel_t channel);

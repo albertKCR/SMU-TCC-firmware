@@ -1,18 +1,18 @@
 #include "SMU.h"
 
-void SMU_Init(void)
+void SMU_Init(SPI_HandleTypeDef DAC8760hspi)
 {
-    Channel_Init(&Channel1, &Ch1_Potentiostat_DAC, &Ch1_Galvanostat_DAC, AIN0, AIN2, AIN3);
-    Channel_Init(&Channel2, &Ch2_Potentiostat_DAC, &Ch2_Galvanostat_DAC, AIN1, AIN4, AIN5);
+    Channel_Init(&Channel1, &Ch1_Potentiostat_DAC, &Ch1_Galvanostat_DAC, AIN0, AIN2, AIN3, DAC8760hspi);
+    Channel_Init(&Channel2, &Ch2_Potentiostat_DAC, &Ch2_Galvanostat_DAC, AIN1, AIN4, AIN5, DAC8760hspi);
 
     ADS1262_Init();
 }
 
 void Channel_Init(channel_t *channel, DAC8760_t *potentiostat_DAC, DAC8760_t *galvanostat_DAC, uint16_t ammeter_AIN,
-                  uint16_t voltmeter_AINP, uint16_t voltmeter_AINN)
+                  uint16_t voltmeter_AINP, uint16_t voltmeter_AINN, SPI_HandleTypeDef DAC8760hspi)
 {
-    DAC8760_Init(&Ch1_Potentiostat_DAC, DAC8760_1_LATCH_Pin, DAC8760_1_LATCH_GPIO_Port);
-    DAC8760_Init(&Ch1_Galvanostat_DAC, DAC8760_2_LATCH_Pin, DAC8760_2_LATCH_GPIO_Port);
+    DAC8760_Init(&Ch1_Potentiostat_DAC, DAC8760_1_LATCH_Pin, DAC8760_1_LATCH_GPIO_Port, DAC8760hspi);
+    DAC8760_Init(&Ch1_Galvanostat_DAC, DAC8760_2_LATCH_Pin, DAC8760_2_LATCH_GPIO_Port, DAC8760hspi);
 
     channel->Potentiostat_DAC = *potentiostat_DAC;
     channel->Galvanostat_DAC = *galvanostat_DAC;
@@ -61,6 +61,8 @@ void SMU_SetCurrent(float output, channel_t channel)
 
 void SMU_LSV(LSV lsv)
 {
+    double read;
+    char message[200];
     float stepTime = (lsv.voltageStep * 1000 * 1000) / lsv.scanRate;
     uint32_t timer = 0;
 
@@ -77,7 +79,10 @@ void SMU_LSV(LSV lsv)
     {
         timer = HAL_GetTick();
         SMU_SetVoltage(i, lsv.channel);
-        SMU_CurrentRead(lsv.channel);
+        read = SMU_CurrentRead(lsv.channel);
+
+        snprintf(message, sizeof(message), "p;%.5f;%.13f", i, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
 
         i += direction * lsv.voltageStep;
         while ((HAL_GetTick() - timer) < stepTime)
@@ -88,6 +93,8 @@ void SMU_LSV(LSV lsv)
 }
 void SMU_CV(CV cv)
 {
+    double read;
+    char message[200];
     float stepTime = (cv.voltageStep * 1000 * 1000) / cv.scanRate;
     uint32_t timer = 0;
 
@@ -106,7 +113,10 @@ void SMU_CV(CV cv)
         {
             timer = HAL_GetTick();
             SMU_SetVoltage(i, cv.channel);
-            SMU_CurrentRead(cv.channel);
+            read = SMU_CurrentRead(cv.channel);
+
+            snprintf(message, sizeof(message), "p;%.5f;%.13f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
 
             i += direction * cv.voltageStep;
             while ((HAL_GetTick() - timer) < stepTime)
@@ -123,7 +133,10 @@ void SMU_CV(CV cv)
         {
             timer = HAL_GetTick();
             SMU_SetVoltage(i, cv.channel);
-            SMU_CurrentRead(cv.channel);
+            read = SMU_CurrentRead(cv.channel);
+
+            snprintf(message, sizeof(message), "p;%.5f;%.13f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
 
             i += direction * cv.voltageStep;
             while ((HAL_GetTick() - timer) < stepTime)
@@ -140,7 +153,10 @@ void SMU_CV(CV cv)
         {
             timer = HAL_GetTick();
             SMU_SetVoltage(i, cv.channel);
-            SMU_CurrentRead(cv.channel);
+            read = SMU_CurrentRead(cv.channel);
+
+            snprintf(message, sizeof(message), "p;%.5f;%.13f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
 
             i += direction * cv.voltageStep;
             while ((HAL_GetTick() - timer) < stepTime)
@@ -153,6 +169,8 @@ void SMU_CV(CV cv)
 
 void SMU_DPV(DPV dpv)
 {
+    double read;
+    char message[200];
     uint32_t timer = 0;
 
     int direction;
@@ -172,7 +190,11 @@ void SMU_DPV(DPV dpv)
         lastVoltage += direction * (dpv.voltagePulse + dpv.voltageStep);
 
         SMU_SetVoltage(lastVoltage, dpv.channel);
-        SMU_CurrentRead(dpv.channel);
+        read = SMU_CurrentRead(dpv.channel);
+
+        snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
+        
         while ((HAL_GetTick() - timer) < dpv.pulseTime)
         {
         }
@@ -180,7 +202,10 @@ void SMU_DPV(DPV dpv)
         lastVoltage -= direction * dpv.voltagePulse;
 
         SMU_SetVoltage(lastVoltage, dpv.channel);
-        SMU_CurrentRead(dpv.channel);
+        read = SMU_CurrentRead(dpv.channel);
+
+        snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
 
         while ((HAL_GetTick() - timer) < dpv.baseTime)
         {
@@ -192,6 +217,8 @@ void SMU_DPV(DPV dpv)
 
 void SMU_SWV(SWV swv)
 {
+    double read;
+    char message[200];
     float stepTime = 1000 / swv.frequency;
     uint32_t timer = 0;
 
@@ -204,7 +231,9 @@ void SMU_SWV(SWV swv)
 
     float lastVoltage = swv.initialVoltage;
     SMU_SetVoltage(lastVoltage, swv.channel);
-    SMU_CurrentRead(swv.channel);
+    read = SMU_CurrentRead(swv.channel);
+    snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
+    CDC_Transmit_FS(message, strlen((char *)message));
 
     while ((direction == 1 && lastVoltage <= swv.finalVoltage) || (direction == -1 && lastVoltage >= swv.finalVoltage))
     {
@@ -212,7 +241,11 @@ void SMU_SWV(SWV swv)
         lastVoltage += direction * (swv.voltageAmplitude + swv.voltageStep);
 
         SMU_SetVoltage(lastVoltage, swv.channel);
-        SMU_CurrentRead(swv.channel);
+        read = SMU_CurrentRead(swv.channel);
+
+        snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
+        
         while ((HAL_GetTick() - timer) < stepTime / 2)
         {
         }
@@ -220,7 +253,10 @@ void SMU_SWV(SWV swv)
         lastVoltage -= direction * swv.voltageAmplitude;
 
         SMU_SetVoltage(lastVoltage, swv.channel);
-        SMU_CurrentRead(swv.channel);
+        read = SMU_CurrentRead(swv.channel);
+
+        snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
 
         while ((HAL_GetTick() - timer) < stepTime / 2)
         {
@@ -231,6 +267,8 @@ void SMU_SWV(SWV swv)
 
 void SMU_CP(CP cp)
 {
+    double read;
+    char message[200];
     uint32_t timer1 = 0;
     uint32_t timer2 = 0;
 
@@ -242,7 +280,10 @@ void SMU_CP(CP cp)
     while ((HAL_GetTick() - timer1) < cp.samplePeriod)
     {
         timer2 = HAL_GetTick();
-        SMU_VoltageRead(cp.channel);
+        read = SMU_VoltageRead(cp.channel);
+
+        snprintf(message, sizeof(message), "g;%.5f;%.5f", cp.constCurrent, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
 
         while ((HAL_GetTick() - timer2) < cp.sampleTime)
         {
@@ -253,6 +294,8 @@ void SMU_CP(CP cp)
 
 void SMU_LSP(LSP lsp)
 {
+    double read;
+    char message[200];
     float stepTime = (lsp.currentStep * 1000 * 1000) / lsp.scanRate;
     uint32_t timer = 0;
 
@@ -269,7 +312,10 @@ void SMU_LSP(LSP lsp)
     {
         timer = HAL_GetTick();
         SMU_SetCurrent(i, lsp.channel);
-        SMU_VoltageRead(lsp.channel);
+        read = SMU_VoltageRead(lsp.channel);
+
+        snprintf(message, sizeof(message), "g;%.5f;%.5f", i, read);
+        CDC_Transmit_FS(message, strlen((char *)message));
 
         i += direction * lsp.currentStep;
         while ((HAL_GetTick() - timer) < stepTime)
@@ -281,6 +327,8 @@ void SMU_LSP(LSP lsp)
 
 void SMU_CyP(CyP cyp)
 {
+    double read;
+    char message[200];
     float stepTime = (cyp.currentStep * 1000 * 1000) / cyp.scanRate;
     uint32_t timer = 0;
 
@@ -299,8 +347,11 @@ void SMU_CyP(CyP cyp)
         {
             timer = HAL_GetTick();
             SMU_SetCurrent(i, cyp.channel);
-            SMU_VoltageRead(cyp.channel);
-
+            read = SMU_VoltageRead(cyp.channel);
+            
+            snprintf(message, sizeof(message), "g;%.5f;%.5f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
+            
             i += direction * cyp.currentStep;
             while ((HAL_GetTick() - timer) < stepTime)
             {
@@ -316,7 +367,10 @@ void SMU_CyP(CyP cyp)
         {
             timer = HAL_GetTick();
             SMU_SetCurrent(i, cyp.channel);
-            SMU_VoltageRead(cyp.channel);
+            read = SMU_VoltageRead(cyp.channel);
+
+            snprintf(message, sizeof(message), "g;%.5f;%.5f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
 
             i += direction * cyp.currentStep;
             while ((HAL_GetTick() - timer) < stepTime)
@@ -333,7 +387,10 @@ void SMU_CyP(CyP cyp)
         {
             timer = HAL_GetTick();
             SMU_SetCurrent(i, cyp.channel);
-            SMU_VoltageRead(cyp.channel);
+            read = SMU_VoltageRead(cyp.channel);
+
+            snprintf(message, sizeof(message), "g;%.5f;%.5f", i, read);
+            CDC_Transmit_FS(message, strlen((char *)message));
 
             i += direction * cyp.currentStep;
             while ((HAL_GetTick() - timer) < stepTime)
@@ -350,6 +407,8 @@ void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementD
     int i = 0;
     uint32_t timerCh1 = 0;
     uint32_t timerCh2 = 0;
+    char message[200];
+    double read;
 
     while ((j < channel1Data.length) && (i < channel2Data.length))
     {
@@ -359,14 +418,18 @@ void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementD
             if (channel1Data.potentiostat)
             {
                 SMU_SetVoltage(channel1Data.values[j], channel1Data.channel);
-                SMU_CurrentRead(channel1Data.channel);
+                read = SMU_CurrentRead(channel1Data.channel);
                 j++;
+                snprintf(message, sizeof(message), "ch1;p;%.5f;%.13f", channel1Data.values[j], read);
+                CDC_Transmit_FS(message, strlen((char *)message));
             }
             else
             {
                 SMU_SetCurrent(channel1Data.values[j], channel1Data.channel);
-                SMU_VoltageRead(channel1Data.channel);
+                read = SMU_VoltageRead(channel1Data.channel);
                 j++;
+                snprintf(message, sizeof(message), "ch1;g;%.5f;%.5f", channel1Data.values[j], read);
+                CDC_Transmit_FS(message, strlen((char *)message));
             }
             
         }
@@ -376,14 +439,18 @@ void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementD
             if (channel2Data.potentiostat)
             {
                 SMU_SetVoltage(channel2Data.values[i], channel2Data.channel);
-                SMU_CurrentRead(channel2Data.channel);
+                read = SMU_CurrentRead(channel2Data.channel);
                 i++;
+                snprintf(message, sizeof(message), "ch2;p;%.5f;%.13f", channel2Data.values[i], read);
+                CDC_Transmit_FS(message, strlen((char *)message));
             }
             else
             {
-                SMU_SetCurrent(channel2Data.values[i], channe2Data.channel);
-                SMU_VoltageRead(channel2Data.channel);
+                SMU_SetCurrent(channel2Data.values[i], channel2Data.channel);
+                read = SMU_VoltageRead(channel2Data.channel);
                 i++;
+                snprintf(message, sizeof(message), "ch2;g;%.5f;%.5f", channel2Data.values[i], read); // g means galvanostat
+                CDC_Transmit_FS(message, strlen((char *)message));
             }
             
         }
