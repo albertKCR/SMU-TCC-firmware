@@ -194,7 +194,7 @@ void SMU_DPV(DPV dpv)
 
         snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
         CDC_Transmit_FS(message, strlen((char *)message));
-        
+
         while ((HAL_GetTick() - timer) < dpv.pulseTime)
         {
         }
@@ -245,7 +245,7 @@ void SMU_SWV(SWV swv)
 
         snprintf(message, sizeof(message), "p;%.5f;%.13f", lastVoltage, read);
         CDC_Transmit_FS(message, strlen((char *)message));
-        
+
         while ((HAL_GetTick() - timer) < stepTime / 2)
         {
         }
@@ -348,10 +348,10 @@ void SMU_CyP(CyP cyp)
             timer = HAL_GetTick();
             SMU_SetCurrent(i, cyp.channel);
             read = SMU_VoltageRead(cyp.channel);
-            
+
             snprintf(message, sizeof(message), "g;%.5f;%.5f", i, read);
             CDC_Transmit_FS(message, strlen((char *)message));
-            
+
             i += direction * cyp.currentStep;
             while ((HAL_GetTick() - timer) < stepTime)
             {
@@ -431,7 +431,6 @@ void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementD
                 snprintf(message, sizeof(message), "ch1;g;%.5f;%.5f", channel1Data.values[j], read);
                 CDC_Transmit_FS(message, strlen((char *)message));
             }
-            
         }
         timerCh2 = HAL_GetTick();
         if (((HAL_GetTick() - timerCh2) > channel2Data.timeStep) && (i < channel2Data.length))
@@ -452,13 +451,497 @@ void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementD
                 snprintf(message, sizeof(message), "ch2;g;%.5f;%.5f", channel2Data.values[i], read); // g means galvanostat
                 CDC_Transmit_FS(message, strlen((char *)message));
             }
-            
         }
     }
 }
 
 void dwin_interface()
 {
+    waitForDwin();
+}
+
+void waitForDwin()
+{
+    uint8_t buffer1[10];
+
+    uint8_t rxByte[6] = {0};
+    if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+    {
+        sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+        CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+        if (strcmp(buffer1, "2500") == 0)
+        {
+            pageID = 0x01;
+            dwinChannel = 1;
+            setDisplayPage(pageID);
+            waitForDwinTechnique();
+        }
+        else if (strcmp(buffer1, "2501") == 0)
+        {
+            pageID = 0x01;
+            dwinChannel = 2;
+            setDisplayPage(pageID);
+            waitForDwinTechnique();
+        }
+    }
+}
+
+void waitForDwinTechnique()
+{
+    while (pageID == 0x01)
+    {
+        uint8_t msg[10];
+        sprintf(msg, "pageID=0x01");
+        CDC_Transmit_FS(msg, strlen(msg));
+
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2510") == 0) // LSV
+            {
+                pageID = 0x02;
+                setDisplayPage(pageID);
+                LSV_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2511") == 0) // CV
+            {
+                pageID = 0x03;
+                setDisplayPage(pageID);
+                CV_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2512") == 0) // DPV
+            {
+                pageID = 0x04;
+                setDisplayPage(pageID);
+                DPV_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2513") == 0) // SWV
+            {
+                pageID = 0x05;
+                setDisplayPage(pageID);
+                SWV_DWIN_Page();
+            }
+
+            if (strcmp(buffer1, "2514") == 0) // CP
+            {
+                pageID = 0x06;
+                setDisplayPage(pageID);
+                CP_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2515") == 0) // LSP
+            {
+                pageID = 0x07;
+                setDisplayPage(pageID);
+                LSP_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2516") == 0) // CyP
+            {
+                pageID = 0x08;
+                setDisplayPage(pageID);
+                CyP_DWIN_Page();
+            }
+            if (strcmp(buffer1, "2517") == 0) // Back button
+            {
+                pageID = 0x00;
+                dwinChannel = 0;
+                setDisplayPage(pageID);
+            }
+        }
+    }
+}
+
+void LSV_DWIN_Page()
+{
+    while (pageID == 0x02)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getLSVParameters_DWIN();
+            }
+        }
+    }
+}
+
+void CV_DWIN_Page()
+{
+    while (pageID == 0x03)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getCVParameters_DWIN();
+            }
+        }
+    }
+}
+
+void DPV_DWIN_Page()
+{
+    while (pageID == 0x04)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getDPVParameters_DWIN();
+            }
+        }
+    }
+}
+
+void SWV_DWIN_Page()
+{
+    while (pageID == 0x05)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getSWVParameters_DWIN();
+            }
+        }
+    }
+}
+
+void CP_DWIN_Page()
+{
+    while (pageID == 0x06)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getCPParameters_DWIN();
+            }
+        }
+    }
+}
+
+void LSP_DWIN_Page()
+{
+    while (pageID == 0x07)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getLSPParameters_DWIN();
+            }
+        }
+    }
+}
+
+void CyP_DWIN_Page()
+{
+    while (pageID == 0x08)
+    {
+        uint8_t buffer1[10];
+
+        uint8_t rxByte[6] = {0};
+        if (HAL_UART_Receive(&huart1, rxByte, 6, 500) == HAL_OK)
+        {
+            sprintf(buffer1, "%02X%02X", rxByte[4], rxByte[5]);
+            CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+            if (strcmp(buffer1, "2518") == 0) // Back button
+            {
+                pageID = 0x01;
+                setDisplayPage(pageID);
+            }
+
+            if (strcmp(buffer1, "2519") == 0) // Start button
+            {
+                getCyPParameters_DWIN();
+            }
+        }
+    }
+}
+
+void getLSVParameters_DWIN()
+{
+    LSV lsv;
+
+    if (dwinChannel == 1) lsv.channel = Channel1;
+    else if (dwinChannel == 2) lsv.channel = Channel2;
+
+    readVP(LSV_InitialVoltage_VP, 6);
+    readDisplayFloat(&lsv.initialVoltage);
+
+    readVP(LSV_FinalVoltage_VP, 6);
+    readDisplayFloat(&lsv.finalVoltage);
+
+    readVP(LSV_StepSize_VP, 6);
+    readDisplayFloat(&lsv.voltageStep);
+
+    readVP(LSV_ScanRate_VP, 6);
+    readDisplayFloat(&lsv.scanRate);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f", lsv.initialVoltage, lsv.finalVoltage, lsv.voltageStep, lsv.scanRate);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_LSV(lsv);
+}
+
+void getCVParameters_DWIN()
+{
+    CV cv;
+
+    if (dwinChannel == 1) cv.channel = Channel1;
+    else if (dwinChannel == 2) cv.channel = Channel2;
+
+    readVP(CV_InitialVoltage_VP, 6);
+    readDisplayFloat(&cv.initialVoltage);
+
+    readVP(CV_FinalVoltage_VP, 6);
+    readDisplayFloat(&cv.finalVoltage);
+
+    readVP(CV_Peak1_VP, 6);
+    readDisplayFloat(&cv.peak1Voltage);
+
+    readVP(CV_Peak2_VP, 6);
+    readDisplayFloat(&cv.peak2Voltage);
+
+    readVP(CV_StepSize_VP, 6);
+    readDisplayFloat(&cv.voltageStep);
+
+    readVP(CV_ScanRate_VP, 6);
+    readDisplayFloat(&cv.scanRate);
+
+    readVP(CV_Cycles_VP, 6);
+    readDisplayFloat(&cv.cycles);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f; %f; %f; %f", cv.initialVoltage, cv.finalVoltage, cv.peak1Voltage, cv.peak2Voltage, cv.voltageStep, cv.scanRate, cv.cycles);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_CV(cv);
+}
+
+void getDPVParameters_DWIN()
+{
+    DPV dpv;
+
+    if (dwinChannel == 1) dpv.channel = Channel1;
+    else if (dwinChannel == 2) dpv.channel = Channel2;
+
+    readVP(DPV_InitialVoltage_VP, 6);
+    readDisplayFloat(&dpv.initialVoltage);
+
+    readVP(DPV_FinalVoltage_VP, 6);
+    readDisplayFloat(&dpv.finalVoltage);
+
+    readVP(DPV_StepSize_VP, 6);
+    readDisplayFloat(&dpv.voltageStep);
+
+    readVP(DPV_PulseV_VP, 6);
+    readDisplayFloat(&dpv.voltagePulse);
+
+    readVP(DPV_PulseTime_VP, 6);
+    readDisplayFloat(&dpv.pulseTime);
+
+    readVP(DPV_BaseTime_VP, 6);
+    readDisplayFloat(&dpv.baseTime);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f; %f; %f", dpv.initialVoltage, dpv.finalVoltage, dpv.voltageStep, dpv.voltagePulse, dpv.pulseTime, dpv.baseTime);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_DPV(dpv);
+}
+
+void getSWVParameters_DWIN()
+{
+    SWV swv;
+
+    if (dwinChannel == 1) swv.channel = Channel1;
+    else if (dwinChannel == 2) swv.channel = Channel2;
+
+    readVP(SWV_InitialVoltage_VP, 6);
+    readDisplayFloat(&swv.initialVoltage);
+
+    readVP(SWV_FinalVoltage_VP, 6);
+    readDisplayFloat(&swv.finalVoltage);
+
+    readVP(SWV_StepSize_VP, 6);
+    readDisplayFloat(&swv.voltageStep);
+
+    readVP(SWV_AmplitudeV_VP, 6);
+    readDisplayFloat(&swv.voltageAmplitude);
+
+    readVP(SWV_Frequency_VP, 6);
+    readDisplayFloat(&swv.frequency);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f; %f", swv.initialVoltage, swv.finalVoltage, swv.voltageStep, swv.voltageAmplitude, swv.frequency);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_SWV(swv);
+}
+
+void getCPParameters_DWIN()
+{
+    CP cp;
+
+    if (dwinChannel == 1) cp.channel = Channel1;
+    else if (dwinChannel == 2) cp.channel = Channel2;
+
+    readVP(CP_ConstI_VP, 6);
+    readDisplayFloat(&cp.constCurrent);
+
+    readVP(CP_SampleT_VP, 6);
+    readDisplayFloat(&cp.sampleTime);
+
+    readVP(CP_SampleP_VP, 6);
+    readDisplayFloat(&cp.samplePeriod);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f", cp.constCurrent, cp.sampleTime, cp.samplePeriod);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_CP(cp);
+}
+
+void getLSPParameters_DWIN()
+{
+    LSP lsp;
+
+    if (dwinChannel == 1) lsp.channel = Channel1;
+    else if (dwinChannel == 2) lsp.channel = Channel2;
+
+    readVP(LSP_InitialI_VP, 6);
+    readDisplayFloat(&lsp.initialCurrent);
+
+    readVP(LSP_FinalI_VP, 6);
+    readDisplayFloat(&lsp.finalCurrent);
+
+    readVP(LSP_StepSize_VP, 6);
+    readDisplayFloat(&lsp.currentStep);
+
+    readVP(LSP_ScanRate_VP, 6);
+    readDisplayFloat(&lsp.scanRate);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f", lsp.initialCurrent, lsp.finalCurrent, lsp.currentStep, lsp.scanRate);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_LSP(lsp);
+}
+
+void getCyPParameters_DWIN()
+{
+    CyP cyp;
+
+    if (dwinChannel == 1) cyp.channel = Channel1;
+    else if (dwinChannel == 2) cyp.channel = Channel2;
+
+    readVP(CyP_InitialI_VP, 6);
+    readDisplayFloat(&cyp.initialCurrent);
+
+    readVP(CyP_FinalI_VP, 6);
+    readDisplayFloat(&cyp.finalCurrent);
+
+    readVP(CyP_Peak1_VP, 6);
+    readDisplayFloat(&cyp.peak1Current);
+
+    readVP(CyP_Peak2_VP, 6);
+    readDisplayFloat(&cyp.peak2Current);
+
+    readVP(CyP_StepSize_VP, 6);
+    readDisplayFloat(&cyp.currentStep);
+
+    readVP(CyP_ScanRate_VP, 6);
+    readDisplayFloat(&cyp.scanRate);
+
+    readVP(CyP_Cycles_VP, 6);
+    readDisplayFloat(&cyp.cycles);
+
+    uint8_t buffer1[10];
+    sprintf(buffer1, "%f; %f; %f; %f; %f; %f; %f", cyp.initialCurrent, cyp.finalCurrent, cyp.peak1Current, cyp.peak2Current, cyp.currentStep, cyp.scanRate, cyp.cycles);
+    CDC_Transmit_FS(buffer1, strlen(buffer1));
+
+    SMU_CyP(cyp);
 }
 
 void pc_interface()

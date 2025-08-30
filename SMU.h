@@ -6,7 +6,51 @@
 #include <stdbool.h>
 #include "DAC8760.h"
 #include "ADS1262.h"
+#include "DWIN.h"
 #include "usb_device.h"
+
+#define LSV_InitialVoltage_VP   0x2100
+#define LSV_FinalVoltage_VP     0x2103
+#define LSV_StepSize_VP         0x2106
+#define LSV_ScanRate_VP         0x2109
+
+#define CV_InitialVoltage_VP    0x2110
+#define CV_FinalVoltage_VP      0x2119
+#define CV_Peak1_VP             0x2113
+#define CV_Peak2_VP             0x2116
+#define CV_StepSize_VP          0x211C
+#define CV_ScanRate_VP          0x2120
+#define CV_Cycles_VP            0x2123
+
+#define DPV_InitialVoltage_VP   0x2126
+#define DPV_FinalVoltage_VP     0x2129
+#define DPV_StepSize_VP         0x212C
+#define DPV_PulseV_VP           0x2130
+#define DPV_PulseTime_VP        0x2133
+#define DPV_BaseTime_VP         0x2136
+
+#define SWV_InitialVoltage_VP   0x2139
+#define SWV_FinalVoltage_VP     0x213C
+#define SWV_StepSize_VP         0x2140
+#define SWV_AmplitudeV_VP       0x2143
+#define SWV_Frequency_VP        0x2146
+
+#define CP_ConstI_VP            0x2149
+#define CP_SampleT_VP           0x214C
+#define CP_SampleP_VP           0x2150
+
+#define LSP_InitialI_VP         0x2153
+#define LSP_FinalI_VP           0x2156
+#define LSP_StepSize_VP         0x2159
+#define LSP_ScanRate_VP         0x215C
+
+#define CyP_InitialI_VP         0x2160
+#define CyP_FinalI_VP           0x2169
+#define CyP_Peak1_VP            0x2163
+#define CyP_Peak2_VP            0x2166
+#define CyP_StepSize_VP         0x216C
+#define CyP_ScanRate_VP         0x2170
+#define CyP_Cycles_VP           0x2173
 
 typedef struct
 {
@@ -45,7 +89,7 @@ typedef struct
     float finalVoltage;
     float voltageStep;
     float scanRate;
-    int cycles;
+    float cycles;
 } CV;
 
 typedef struct
@@ -95,7 +139,7 @@ typedef struct
     float finalCurrent;
     float currentStep;
     float scanRate;
-    int cycles;
+    float cycles;
 } CyP;
 
 #pragma endregion
@@ -107,9 +151,12 @@ extern DAC8760_t Ch1_Galvanostat_DAC;  // Galvanostat Channel 1
 extern DAC8760_t Ch2_Potentiostat_DAC; // Potentiostat Channel 2
 extern DAC8760_t Ch2_Galvanostat_DAC;  // Galvanostat Channel 2
 
+extern UART_HandleTypeDef huart1;
 extern float currentResistor;
 extern float ammeterResistors [7];
 extern float currentSourceResistor;
+extern int pageID;
+extern uint8_t dwinChannel;
 extern bool HMIflag;   // HMI flag -> 0 PC ; 1 DWIN display
 
 void SMU_Init(SPI_HandleTypeDef DAC8760hspi);
@@ -133,11 +180,20 @@ void SMU_CyP(CyP cyp);  // Cyclic Potentiometry
 
 void SMU_dualChannelMeasure(ArrayMeasurementData channel1Data, ArrayMeasurementData channel2Data);
 
+// set parameters from DWIN
+void waitForDwin();
+void waitForDwinTechnique();
+void LSV_DWIN_Page();
+void getLSVParameters_DWIN();
+void getCVParameters_DWIN();
+void getDPVParameters_DWIN();
+void getSWVParameters_DWIN();
+
+// set parameters from PC
 void setLSVParameters(LSV *lsv, char *parameters, bool channel);
 void setCVParameters(CV *cv, char *parameters, bool channel);
 void setDPVParameters(DPV *dpv, char *parameters, bool channel);
 void setSWVParameters(SWV *swv, char *parameters, bool channel);
-
 void setCPParameters(CP *cp, char *parameters, bool channel);
 void setLSPParameters(LSP *lsp, char *parameters, bool channel);
 void setCyPParameters(CyP *cyp, char *parameters, bool channel);
