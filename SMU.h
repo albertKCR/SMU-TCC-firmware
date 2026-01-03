@@ -59,6 +59,7 @@ typedef struct
     uint16_t Ammeter_AIN;       // Analog IN used for the ammeter
     uint16_t Voltmeter_AINN;    // Negative analog IN used for the voltmeter
     uint16_t Voltmeter_AINP;    // Positive analog IN used for the voltmeter
+    bool channel1;              // bool to identifie which channel it is, then its possible to use if to know which channel
 } channel_t;
 
 typedef struct
@@ -151,20 +152,28 @@ extern DAC8760_t Ch1_Galvanostat_DAC;  // Galvanostat Channel 1
 extern DAC8760_t Ch2_Potentiostat_DAC; // Potentiostat Channel 2
 extern DAC8760_t Ch2_Galvanostat_DAC;  // Galvanostat Channel 2
 
+extern char input[64];
+extern uint8_t USB_newData;
+
+extern TIM_HandleTypeDef htim2;
 extern UART_HandleTypeDef huart1;
-extern float currentResistor;
-extern float ammeterResistors [7];
+extern int currentAmmeterResistorIndex;
+extern float currentAmmeterResistor;
+extern float ammeterResistors [7]; //{10, 100, 1000, 10000, 100000, 1000000, 10000000};
 extern float currentSourceResistor;
 extern int pageID;
 extern uint8_t dwinChannel;
 extern bool HMIflag;   // HMI flag -> 0 PC ; 1 DWIN display
 
 void SMU_Init(SPI_HandleTypeDef DAC8760hspi);
-void Channel_Init(channel_t *channel, DAC8760_t *potentiostat_DAC, DAC8760_t *galvanostat_DAC, uint16_t ammeter_AIN,
+void Channel1_Init(channel_t *channel, DAC8760_t *potentiostat_DAC, DAC8760_t *galvanostat_DAC, uint16_t ammeter_AIN,
+                  uint16_t voltmeter_AINP, uint16_t voltmeter_AINN, SPI_HandleTypeDef DAC8760hspi);
+void Channel2_Init(channel_t *channel, DAC8760_t *potentiostat_DAC, DAC8760_t *galvanostat_DAC, uint16_t ammeter_AIN,
                   uint16_t voltmeter_AINP, uint16_t voltmeter_AINN, SPI_HandleTypeDef DAC8760hspi);
 
 double SMU_VoltageRead(channel_t channel);
 double SMU_CurrentRead(channel_t channel);
+void SMU_setAmmeterResistor(int currentAmmeterResistorIndex, channel_t channel);
 
 void SMU_SetVoltage(float output, channel_t channel);
 void SMU_SetCurrent(float output, channel_t channel);
